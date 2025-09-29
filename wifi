@@ -1,0 +1,127 @@
+// File: BackendApplication.java
+package com.wifioptimizer;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+
+@SpringBootApplication
+public class BackendApplication {
+    public static void main(String[] args) {
+        SpringApplication.run(BackendApplication.class, args);
+    }
+}
+// File: AuthController.java
+package com.wifioptimizer.controller;
+
+import org.springframework.web.bind.annotation.*;
+
+@RestController
+@RequestMapping("/auth")
+public class AuthController {
+    @PostMapping("/login")
+    public String login(@RequestParam String userId, @RequestParam String password) {
+        if(userId.equals("admin") && password.equals("1234")) {
+            return "success";
+        }
+        return "failed";
+    }
+}
+// File: SimulationController.java
+package com.wifioptimizer.controller;
+
+import org.springframework.web.bind.annotation.*;
+import java.util.*;
+
+@RestController
+@RequestMapping("/simulate")
+public class SimulationController {
+
+    @PostMapping("/run")
+    public Map<String, Object> runSimulation(@RequestParam String wifiType,
+                                             @RequestParam int devices,
+                                             @RequestParam int bandwidth,
+                                             @RequestParam int interference) {
+        Map<String, Object> result = new HashMap<>();
+
+        int baseSpeed = switch (wifiType) {
+            case "Wi-Fi 6" -> 1200;
+            case "Wi-Fi 7" -> 2500;
+            default -> 700;
+        };
+
+        double throughput = baseSpeed * (bandwidth / 80.0) * (1 - interference * 0.05);
+        throughput = Math.max(50, throughput / (1 + devices * 0.05));
+        double latency = 5 + devices * 0.5 + interference * 2;
+        double packetLoss = Math.min(20, interference * 2 + devices * 0.1);
+
+        result.put("throughput", throughput);
+        result.put("latency", latency);
+        result.put("packetLoss", packetLoss);
+
+        return result;
+    }
+}
+import streamlit as st
+import requests
+import matplotlib.pyplot as plt
+
+# -------------------------------
+# LOGIN PAGE
+# -------------------------------
+st.title("🔐 Wi-Fi 6/7 Performance Optimizer - Login")
+
+user_id = st.text_input("Enter User ID")
+password = st.text_input("Enter Password", type="password")
+
+if st.button("Login"):
+    response = requests.post("http://localhost:8080/auth/login", params={"userId": user_id, "password": password})
+    if response.text == "success":
+        st.session_state["logged_in"] = True
+        st.success("✅ Login Successful!")
+    else:
+        st.error("❌ Invalid Credentials")
+
+# -------------------------------
+# DASHBOARD AFTER LOGIN
+# -------------------------------
+if st.session_state.get("logged_in"):
+    st.header("📊 Wi-Fi Simulation Dashboard")
+
+    wifi_type = st.selectbox("Select Wi-Fi Type", ["Wi-Fi 5", "Wi-Fi 6", "Wi-Fi 7"])
+    devices = st.slider("Number of Devices", 1, 100, 10)
+    bandwidth = st.slider("Bandwidth (MHz)", 20, 320, 80, step=20)
+    interference = st.slider("Interference (0=Low, 10=High)", 0, 10, 2)
+
+    if st.button("Run Simulation"):
+        response = requests.post("http://localhost:8080/simulate/run",
+                                 params={"wifiType": wifi_type, "devices": devices,
+                                         "bandwidth": bandwidth, "interference": interference})
+
+        data = response.json()
+        throughput = data["throughput"]
+        latency = data["latency"]
+        packet_loss = data["packetLoss"]
+
+        st.subheader("📶 Results")
+        st.write(f"Throughput: {throughput:.2f} Mbps")
+        st.write(f"Latency: {latency:.2f} ms")
+        st.write(f"Packet Loss: {packet_loss:.2f} %")
+
+        # Graphs
+        fig1, ax1 = plt.subplots()
+        ax1.bar(["Throughput"], [throughput], color="green")
+        st.pyplot(fig1)
+
+        fig2, ax2 = plt.subplots()
+        ax2.bar(["Latency"], [latency], color="orange")
+        st.pyplot(fig2)
+
+        fig3, ax3 = plt.subplots()
+        ax3.bar(["Packet Loss"], [packet_loss], color="red")
+        st.pyplot(fig3)
+    
+    
+   
+    
+    
+    
