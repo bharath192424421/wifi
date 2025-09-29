@@ -1,0 +1,128 @@
+import streamlit as st
+import requests
+import matplotlib.pyplot as plt
+
+# -------------------------------
+# SESSION STATE
+# -------------------------------
+if "logged_in" not in st.session_state:
+    st.session_state["logged_in"] = False
+
+# -------------------------------
+# LOGIN PAGE
+# -------------------------------
+st.title("🔐 Wi-Fi 6/7 Performance Optimizer - Login")
+
+user_id = st.text_input("Enter User ID")
+password = st.text_input("Enter Password", type="password")
+
+if st.button("Login"):
+    try:
+        response = requests.post(
+            "https://<YOUR_RENDER_BACKEND_URL>/auth/login",  # replace with Render backend URL
+            params={"userId": user_id, "password": password},
+            timeout=5
+        )
+        if response.text == "success":
+            st.session_state["logged_in"] = True
+            st.success("✅ Login Successful!")
+        else:
+            st.error("❌ Invalid Credentials")
+    except Exception as e:
+        st.error(f"Backend connection error: {e}")
+
+# -------------------------------
+# DASHBOARD
+# -------------------------------
+if st.session_state.get("logged_in"):
+    st.header("📊 Wi-Fi Simulation Dashboard")
+
+    wifi_type = st.selectbox("Select Wi-Fi Type", ["Wi-Fi 5", "Wi-Fi 6", "Wi-Fi 7"])
+    devices = st.slider("Number of Devices", 1, 100, 10)
+    bandwidth = st.slider("Bandwidth (MHz)", 20, 320, 80, step=20)
+    interference = st.slider("Interference (0=Low, 10=High)", 0, 10, 2)
+
+    if st.button("Run Simulation"):
+        try:
+            response = requests.post(
+                "https://<YOUR_RENDER_BACKEND_URL>/simulate/run",  # replace with Render backend URL
+                params={
+                    "wifiType": wifi_type,
+                    "devices": devices,
+                    "bandwidth": bandwidth,
+                    "interference": interference
+                },
+                timeout=5
+            )
+            data = response.json()
+            throughput = data["throughput"]
+            latency = data["latency"]
+            packet_loss = data["packetLoss"]
+
+            st.subheader("📶 Results")
+            st.write(f"Throughput: {throughput:.2f} Mbps")
+            st.write(f"Latency: {latency:.2f} ms")
+            st.write(f"Packet Loss: {packet_loss:.2f} %")
+
+            # Graphs
+            fig1, ax1 = plt.subplots()
+            ax1.bar(["Throughput"], [throughput], color="green")
+            st.pyplot(fig1)
+
+            fig2, ax2 = plt.subplots()
+            ax2.bar(["Latency"], [latency], color="orange")
+            st.pyplot(fig2)
+
+            fig3, ax3 = plt.subplots()
+            ax3.bar(["Packet Loss"], [packet_loss], color="red")
+            st.pyplot(fig3)
+
+        except Exception as e:
+            st.error(f"Simulation error: {e}")
+const express = require("express");
+const cors = require("cors");
+const app = express();
+const PORT = process.env.PORT || 5000;
+
+app.use(cors());
+app.use(express.json());
+
+// Login endpoint
+app.post("/auth/login", (req, res) => {
+    const { userId, password } = req.query;
+    if(userId === "admin" && password === "1234") {
+        res.send("success");
+    } else {
+        res.send("failed");
+    }
+});
+
+// Simulation endpoint
+app.post("/simulate/run", (req, res) => {
+    const { wifiType, devices, bandwidth, interference } = req.query;
+
+    let baseSpeed = 700;
+    if(wifiType === "Wi-Fi 6") baseSpeed = 1200;
+    if(wifiType === "Wi-Fi 7") baseSpeed = 2500;
+
+    let throughput = baseSpeed * (bandwidth / 80) * (1 - interference * 0.05);
+    throughput = Math.max(50, throughput / (1 + devices * 0.05));
+    let latency = 5 + devices * 0.5 + interference * 2;
+    let packetLoss = Math.min(20, interference * 2 + devices * 0.1);
+
+    res.json({ throughput, latency, packetLoss });
+});
+
+app.listen(PORT, () => console.log(`Backend running on port ${PORT}`));
+{
+  "name": "wifi-backend",
+  "version": "1.0.0",
+  "main": "server.js",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.18.2"
+  },
+  "scripts": {
+    "start": "node server.js"
+  }
+}
